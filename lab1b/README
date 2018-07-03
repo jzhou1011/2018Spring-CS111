@@ -1,0 +1,6 @@
+
+The files included in the tarball are
+lab1b-server.c, a C source module as required by the spec, which compiles cleanly to an executable lab1b-server, which takes three options --port=portno, --compress, and --debug, where the first one is mandatory, and the latter two not so.
+lab1b-client.c, a C source module as required by the spec, which compiles cleanly to an executable lab1b-client, which takes three options --port=portno, --compress, and --log=log_filename, where the first one is mandatory, and the latter two not so.
+Makefile, to build the program and the tarball with options: all, lab1b-server, lab1b-client, dist, clean as well as the default option
+README, this README file with identification information, a description of the included files, the smoke-test cases in the check target, and any other information about my submission that I would like to bring to your attention (e.g., research, limitations, features, testing methodology)..

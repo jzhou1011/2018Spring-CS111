@@ -1,0 +1,462 @@
+Total: 1303 samples
+    1171  89.9%  89.9%     1303 100.0% thread_func
+     106   8.1%  98.0%      106   8.1% __strcmp_sse42
+      14   1.1%  99.1%       14   1.1% SortedList_insert
+      12   0.9% 100.0%       12   0.9% SortedList_lookup
+       0   0.0% 100.0%     1303 100.0% start_thread
+ROUTINE ====================== thread_func in /u/cs/ugrad/jinjing/CS111/lab2b/lab2_list.c
+  1171   1303 Total samples (flat / cumulative)
+     .      .   87: long long calc_time(struct timespec start_t, struct timespec end_t){
+     .      .   88:   long long total_time = 1000000000*(end_t.tv_sec - start_t.tv_sec) + end_t.tv_nsec - start_t.tv_nsec;
+     .      .   89:   return total_time;
+     .      .   90: }
+     .      .   91: 
+---
+     .      .   92: void *thread_func(void* pointer){
+     .      .   93:   int thread_no = *((int *) pointer);
+     .      .   94:   int start = thread_no*num_iter;
+     .      .   95:   int end = start+num_iter;
+     .      .   96:   //fprintf(stderr,"the start and end for thread %d are %d and %d.\n",thread_no, start, end );
+     .      .   97:   int i;
+     .      .   98:   struct timespec ind_start_t,ind_end_t;
+     .      .   99:   long long ind_lock_time = 0;
+     .      .  100:   int list_index;
+     .      .  101:   SortedList_t *cur_list_p;
+     .      .  102:   pthread_mutex_t* cur_lock_p;
+     .      .  103:   int* cur_spinlock_p;
+     .      .  104:   //insert
+     .      .  105:   for(i=start;i<end;i++){
+     .      .  106:     list_index = which_list(ele_arr[i].key);
+     .      .  107:     cur_list_p = &(list_arr[list_index]);
+     .      .  108:     cur_lock_p = &(lock_arr[list_index]);
+     .      .  109:     cur_spinlock_p = &(spinlock_arr[list_index]);
+     .      .  110:     if (debug_flag){
+     .      .  111:       fprintf(stderr, "%s being inserted into list %d,\n", ele_arr[i].key, list_index);
+     .      .  112:     }
+     .      .  113:     if (!sync_flag)
+     .      .  114:       SortedList_insert(cur_list_p,&ele_arr[i]);
+     .      .  115:     else{
+     .      .  116:       switch(sync_opt){
+     .      .  117:         case 'm':
+     .      .  118: //          if (!no_timer){
+     .      .  119:             if ( clock_gettime(CLOCK_MONOTONIC, &ind_start_t) < 0){
+     .      .  120:               temp_errno = errno;
+     .      .  121:               error_handle("clock_gettime() for srart time", temp_errno);
+     .      .  122:             }
+     .      .  123: //          }
+     .      .  124:           pthread_mutex_lock(cur_lock_p);
+     .      .  125: //          if (!no_timer){
+     .      .  126:             if ( clock_gettime(CLOCK_MONOTONIC, &ind_end_t) < 0){
+     .      .  127:               temp_errno = errno;
+     .      .  128:               error_handle("clock_gettime() for end time", temp_errno);
+     .      .  129:             }
+     .      .  130:             ind_lock_time += calc_time(ind_start_t,ind_end_t);
+     .      .  131: //          }
+     .      .  132:           SortedList_insert(cur_list_p,&ele_arr[i]);
+     .      .  133:           pthread_mutex_unlock(cur_lock_p);
+     .      .  134:           break;
+     .      .  135:         case 's':
+     .      .  136: //          if (!no_timer){
+     .      .  137:             if ( clock_gettime(CLOCK_MONOTONIC, &ind_start_t) < 0){
+     .      .  138:               temp_errno = errno;
+     .      .  139:               error_handle("clock_gettime() for srart time", temp_errno);
+     .      .  140:             }
+     .      .  141: //          }
+   655    655  142:           while(__sync_lock_test_and_set(cur_spinlock_p, 1));
+     .      .  143: //          if (!no_timer){
+     .      .  144:             if ( clock_gettime(CLOCK_MONOTONIC, &ind_end_t) < 0){
+     .      .  145:               temp_errno = errno;
+     .      .  146:               error_handle("clock_gettime() for end time", temp_errno);
+     .      .  147:             }
+     .      .  148:             ind_lock_time += calc_time(ind_start_t,ind_end_t);
+     .      .  149: //          }
+     .     59  150:           SortedList_insert(cur_list_p,&ele_arr[i]);
+     .      .  151:           __sync_lock_release(cur_spinlock_p);
+     .      .  152:           break;
+     .      .  153:         default:
+     .      .  154:           fprintf(stderr, "Error with switch due to unrecognized sync option.\r\n");
+     .      .  155:           exit(1);
+     .      .  156:       }
+     .      .  157:     }
+     .      .  158:   }
+     .      .  159: 
+     .      .  160:   //get the length list with sublists
+     .      .  161:   //grab all locks
+     .      .  162:   int length = 0;
+     .      .  163:   if (!sync_flag){
+     .      .  164:     for(i = 0; i< num_sublist;i++){
+     .      .  165:       int temp_length = SortedList_length(&(list_arr[i]));
+     .      .  166:       if (debug_flag){
+     .      .  167:         fprintf(stderr, "List %d has %d elements.\n", i, temp_length);
+     .      .  168:       }
+     .      .  169:       length += temp_length;
+     .      .  170:     }
+     .      .  171:   }
+     .      .  172:   else{
+     .      .  173:     switch(sync_opt){
+     .      .  174:       case 'm':
+     .      .  175: //        if (!no_timer){
+     .      .  176:           if ( clock_gettime(CLOCK_MONOTONIC, &ind_start_t) < 0){
+     .      .  177:             temp_errno = errno;
+     .      .  178:             error_handle("clock_gettime() for srart time", temp_errno);
+     .      .  179:           }
+     .      .  180: //        }
+     .      .  181:         for (i = 0; i < num_sublist; i++){
+     .      .  182:           pthread_mutex_lock(&(lock_arr[i]));
+     .      .  183:         }
+     .      .  184: //        if (!no_timer){
+     .      .  185:           if ( clock_gettime(CLOCK_MONOTONIC, &ind_end_t) < 0){
+     .      .  186:             temp_errno = errno;
+     .      .  187:             error_handle("clock_gettime() for end time", temp_errno);
+     .      .  188:           }
+     .      .  189:           ind_lock_time += calc_time(ind_start_t,ind_end_t);
+     .      .  190: //        }
+     .      .  191:         for(i = 0; i< num_sublist;i++){
+     .      .  192:           int temp_length = SortedList_length(&(list_arr[i]));
+     .      .  193:           if (debug_flag){
+     .      .  194:             fprintf(stderr, "List %d has %d elements.\n", i, temp_length);
+     .      .  195:           }
+     .      .  196:           length += temp_length;
+     .      .  197:         }
+     .      .  198:         for (i = 0; i < num_sublist; i++){
+     .      .  199:           pthread_mutex_unlock(&(lock_arr[i]));
+     .      .  200:         }
+     .      .  201:         break;
+     .      .  202:       case 's':
+     .      .  203: //        if (!no_timer){
+     .      .  204:           if ( clock_gettime(CLOCK_MONOTONIC, &ind_start_t) < 0){
+     .      .  205:             temp_errno = errno;
+     .      .  206:             error_handle("clock_gettime() for srart time", temp_errno);
+     .      .  207:           }
+     .      .  208: //        }
+     .      .  209:         for(i = 0; i < num_sublist; i++){
+     .      .  210:           while(__sync_lock_test_and_set(&(spinlock_arr[i]), 1));
+     .      .  211:         }
+     .      .  212: //        if (!no_timer){
+     .      .  213:           if ( clock_gettime(CLOCK_MONOTONIC, &ind_end_t) < 0){
+     .      .  214:             temp_errno = errno;
+     .      .  215:             error_handle("clock_gettime() for end time", temp_errno);
+     .      .  216:           }
+     .      .  217:           ind_lock_time += calc_time(ind_start_t,ind_end_t);
+     .      .  218: //        }
+     .      .  219:         for(i = 0; i< num_sublist;i++){
+     .      .  220:           int temp_length = SortedList_length(&(list_arr[i]));
+     .      .  221:           if (debug_flag){
+     .      .  222:             fprintf(stderr, "List %d has %d elements.\n", i, temp_length);
+     .      .  223:           }
+     .      .  224:           length += temp_length;
+     .      .  225:         }
+     .      .  226:         for(i = 0; i < num_sublist; i++){
+     .      .  227:           __sync_lock_release(&(spinlock_arr[i]));
+     .      .  228:         }
+     .      .  229:     }
+     .      .  230:   }
+     .      .  231:   if(length < 0){
+     .      .  232:     handle_corrupted_list("check length");
+     .      .  233:   }
+     .      .  234:   //looks up and deletes each of the keys
+     .      .  235:   SortedListElement_t *element_ptr;
+     .      .  236:   for(i=start;i<end;i++){
+     .      .  237:     list_index = which_list(ele_arr[i].key);
+     .      .  238:     cur_list_p = &(list_arr[list_index]);
+     .      .  239:     cur_lock_p = &(lock_arr[list_index]);
+     .      .  240:     cur_spinlock_p = &(spinlock_arr[list_index]);
+     .      .  241:     if (debug_flag){
+     .      .  242:       fprintf(stderr, "%s being lookup and deleted into list %d,\n", ele_arr[i].key, list_index);
+     .      .  243:     }
+     .      .  244:     if (!sync_flag){
+     .      .  245:       element_ptr = SortedList_lookup(cur_list_p, ele_arr[i].key);
+     .      .  246:       if (element_ptr==NULL)
+     .      .  247:         handle_corrupted_list("lookup");
+     .      .  248:       if (SortedList_delete(element_ptr))
+     .      .  249:         handle_corrupted_list("delete");
+     .      .  250:     }
+     .      .  251:     else{
+     .      .  252:       switch(sync_opt){
+     .      .  253:         case 'm':
+     .      .  254: //          if (!no_timer){
+     .      .  255:             if ( clock_gettime(CLOCK_MONOTONIC, &ind_start_t) < 0){
+     .      .  256:               temp_errno = errno;
+     .      .  257:               error_handle("clock_gettime() for srart time", temp_errno);
+     .      .  258:             }
+     .      .  259: //          }
+     .      .  260:           pthread_mutex_lock(cur_lock_p);
+     .      .  261: //          if (!no_timer){
+     .      .  262:             if ( clock_gettime(CLOCK_MONOTONIC, &ind_end_t) < 0){
+     .      .  263:               temp_errno = errno;
+     .      .  264:               error_handle("clock_gettime() for end time", temp_errno);
+     .      .  265:             }
+     .      .  266:             ind_lock_time += calc_time(ind_start_t,ind_end_t);
+     .      .  267: //          }
+     .      .  268:           element_ptr = SortedList_lookup(cur_list_p, ele_arr[i].key);
+     .      .  269:           if (element_ptr==NULL)
+     .      .  270:             handle_corrupted_list("lookup");
+     .      .  271:           if (SortedList_delete(element_ptr))
+     .      .  272:             handle_corrupted_list("delete");
+     .      .  273:           pthread_mutex_unlock(cur_lock_p);
+     .      .  274:           break;
+     .      .  275:         case 's':
+     .      .  276: //          if (!no_timer){
+     .      .  277:             if ( clock_gettime(CLOCK_MONOTONIC, &ind_start_t) < 0){
+     .      .  278:               temp_errno = errno;
+     .      .  279:               error_handle("clock_gettime() for srart time", temp_errno);
+     .      .  280:             }
+     .      .  281: //          }
+   515    515  282:           while(__sync_lock_test_and_set(cur_spinlock_p, 1));
+     .      .  283: //          if (!no_timer){
+     1      1  284:             if ( clock_gettime(CLOCK_MONOTONIC, &ind_end_t) < 0){
+     .      .  285:               temp_errno = errno;
+     .      .  286:               error_handle("clock_gettime() for end time", temp_errno);
+     .      .  287:             }
+     .      .  288:             ind_lock_time += calc_time(ind_start_t,ind_end_t);
+     .      .  289: //          }
+     .     73  290:           element_ptr = SortedList_lookup(cur_list_p, ele_arr[i].key);
+     .      .  291:           if (element_ptr==NULL)
+     .      .  292:             handle_corrupted_list("lookup");
+     .      .  293:           if (SortedList_delete(element_ptr))
+     .      .  294:             handle_corrupted_list("delete");
+     .      .  295:           __sync_lock_release(cur_spinlock_p);
+     .      .  296:           break;
+     .      .  297:         default:
+     .      .  298:           fprintf(stderr, "Error with switch due to unrecognized sync option.\r\n");
+     .      .  299:           exit(1);
+     .      .  300:       }
+     .      .  301:     }
+     .      .  302:   }
+     .      .  303:   total_lock_time += ind_lock_time;
+     .      .  304:   return NULL;
+     .      .  305: }
+---
+     .      .  306: 
+     .      .  307: 
+     .      .  308: int main(int argc, char **argv){
+     .      .  309: 	int num_thread = 1;
+     .      .  310: 
+ROUTINE ====================== thread_func in /u/cs/ugrad/jinjing/CS111/lab2b/lab2_list.c
+  1171   1303 Total samples (flat / cumulative)
+     .      .   87: long long calc_time(struct timespec start_t, struct timespec end_t){
+     .      .   88:   long long total_time = 1000000000*(end_t.tv_sec - start_t.tv_sec) + end_t.tv_nsec - start_t.tv_nsec;
+     .      .   89:   return total_time;
+     .      .   90: }
+     .      .   91: 
+---
+     .      .   92: void *thread_func(void* pointer){
+     .      .   93:   int thread_no = *((int *) pointer);
+     .      .   94:   int start = thread_no*num_iter;
+     .      .   95:   int end = start+num_iter;
+     .      .   96:   //fprintf(stderr,"the start and end for thread %d are %d and %d.\n",thread_no, start, end );
+     .      .   97:   int i;
+     .      .   98:   struct timespec ind_start_t,ind_end_t;
+     .      .   99:   long long ind_lock_time = 0;
+     .      .  100:   int list_index;
+     .      .  101:   SortedList_t *cur_list_p;
+     .      .  102:   pthread_mutex_t* cur_lock_p;
+     .      .  103:   int* cur_spinlock_p;
+     .      .  104:   //insert
+     .      .  105:   for(i=start;i<end;i++){
+     .      .  106:     list_index = which_list(ele_arr[i].key);
+     .      .  107:     cur_list_p = &(list_arr[list_index]);
+     .      .  108:     cur_lock_p = &(lock_arr[list_index]);
+     .      .  109:     cur_spinlock_p = &(spinlock_arr[list_index]);
+     .      .  110:     if (debug_flag){
+     .      .  111:       fprintf(stderr, "%s being inserted into list %d,\n", ele_arr[i].key, list_index);
+     .      .  112:     }
+     .      .  113:     if (!sync_flag)
+     .      .  114:       SortedList_insert(cur_list_p,&ele_arr[i]);
+     .      .  115:     else{
+     .      .  116:       switch(sync_opt){
+     .      .  117:         case 'm':
+     .      .  118: //          if (!no_timer){
+     .      .  119:             if ( clock_gettime(CLOCK_MONOTONIC, &ind_start_t) < 0){
+     .      .  120:               temp_errno = errno;
+     .      .  121:               error_handle("clock_gettime() for srart time", temp_errno);
+     .      .  122:             }
+     .      .  123: //          }
+     .      .  124:           pthread_mutex_lock(cur_lock_p);
+     .      .  125: //          if (!no_timer){
+     .      .  126:             if ( clock_gettime(CLOCK_MONOTONIC, &ind_end_t) < 0){
+     .      .  127:               temp_errno = errno;
+     .      .  128:               error_handle("clock_gettime() for end time", temp_errno);
+     .      .  129:             }
+     .      .  130:             ind_lock_time += calc_time(ind_start_t,ind_end_t);
+     .      .  131: //          }
+     .      .  132:           SortedList_insert(cur_list_p,&ele_arr[i]);
+     .      .  133:           pthread_mutex_unlock(cur_lock_p);
+     .      .  134:           break;
+     .      .  135:         case 's':
+     .      .  136: //          if (!no_timer){
+     .      .  137:             if ( clock_gettime(CLOCK_MONOTONIC, &ind_start_t) < 0){
+     .      .  138:               temp_errno = errno;
+     .      .  139:               error_handle("clock_gettime() for srart time", temp_errno);
+     .      .  140:             }
+     .      .  141: //          }
+   655    655  142:           while(__sync_lock_test_and_set(cur_spinlock_p, 1));
+     .      .  143: //          if (!no_timer){
+     .      .  144:             if ( clock_gettime(CLOCK_MONOTONIC, &ind_end_t) < 0){
+     .      .  145:               temp_errno = errno;
+     .      .  146:               error_handle("clock_gettime() for end time", temp_errno);
+     .      .  147:             }
+     .      .  148:             ind_lock_time += calc_time(ind_start_t,ind_end_t);
+     .      .  149: //          }
+     .     59  150:           SortedList_insert(cur_list_p,&ele_arr[i]);
+     .      .  151:           __sync_lock_release(cur_spinlock_p);
+     .      .  152:           break;
+     .      .  153:         default:
+     .      .  154:           fprintf(stderr, "Error with switch due to unrecognized sync option.\r\n");
+     .      .  155:           exit(1);
+     .      .  156:       }
+     .      .  157:     }
+     .      .  158:   }
+     .      .  159: 
+     .      .  160:   //get the length list with sublists
+     .      .  161:   //grab all locks
+     .      .  162:   int length = 0;
+     .      .  163:   if (!sync_flag){
+     .      .  164:     for(i = 0; i< num_sublist;i++){
+     .      .  165:       int temp_length = SortedList_length(&(list_arr[i]));
+     .      .  166:       if (debug_flag){
+     .      .  167:         fprintf(stderr, "List %d has %d elements.\n", i, temp_length);
+     .      .  168:       }
+     .      .  169:       length += temp_length;
+     .      .  170:     }
+     .      .  171:   }
+     .      .  172:   else{
+     .      .  173:     switch(sync_opt){
+     .      .  174:       case 'm':
+     .      .  175: //        if (!no_timer){
+     .      .  176:           if ( clock_gettime(CLOCK_MONOTONIC, &ind_start_t) < 0){
+     .      .  177:             temp_errno = errno;
+     .      .  178:             error_handle("clock_gettime() for srart time", temp_errno);
+     .      .  179:           }
+     .      .  180: //        }
+     .      .  181:         for (i = 0; i < num_sublist; i++){
+     .      .  182:           pthread_mutex_lock(&(lock_arr[i]));
+     .      .  183:         }
+     .      .  184: //        if (!no_timer){
+     .      .  185:           if ( clock_gettime(CLOCK_MONOTONIC, &ind_end_t) < 0){
+     .      .  186:             temp_errno = errno;
+     .      .  187:             error_handle("clock_gettime() for end time", temp_errno);
+     .      .  188:           }
+     .      .  189:           ind_lock_time += calc_time(ind_start_t,ind_end_t);
+     .      .  190: //        }
+     .      .  191:         for(i = 0; i< num_sublist;i++){
+     .      .  192:           int temp_length = SortedList_length(&(list_arr[i]));
+     .      .  193:           if (debug_flag){
+     .      .  194:             fprintf(stderr, "List %d has %d elements.\n", i, temp_length);
+     .      .  195:           }
+     .      .  196:           length += temp_length;
+     .      .  197:         }
+     .      .  198:         for (i = 0; i < num_sublist; i++){
+     .      .  199:           pthread_mutex_unlock(&(lock_arr[i]));
+     .      .  200:         }
+     .      .  201:         break;
+     .      .  202:       case 's':
+     .      .  203: //        if (!no_timer){
+     .      .  204:           if ( clock_gettime(CLOCK_MONOTONIC, &ind_start_t) < 0){
+     .      .  205:             temp_errno = errno;
+     .      .  206:             error_handle("clock_gettime() for srart time", temp_errno);
+     .      .  207:           }
+     .      .  208: //        }
+     .      .  209:         for(i = 0; i < num_sublist; i++){
+     .      .  210:           while(__sync_lock_test_and_set(&(spinlock_arr[i]), 1));
+     .      .  211:         }
+     .      .  212: //        if (!no_timer){
+     .      .  213:           if ( clock_gettime(CLOCK_MONOTONIC, &ind_end_t) < 0){
+     .      .  214:             temp_errno = errno;
+     .      .  215:             error_handle("clock_gettime() for end time", temp_errno);
+     .      .  216:           }
+     .      .  217:           ind_lock_time += calc_time(ind_start_t,ind_end_t);
+     .      .  218: //        }
+     .      .  219:         for(i = 0; i< num_sublist;i++){
+     .      .  220:           int temp_length = SortedList_length(&(list_arr[i]));
+     .      .  221:           if (debug_flag){
+     .      .  222:             fprintf(stderr, "List %d has %d elements.\n", i, temp_length);
+     .      .  223:           }
+     .      .  224:           length += temp_length;
+     .      .  225:         }
+     .      .  226:         for(i = 0; i < num_sublist; i++){
+     .      .  227:           __sync_lock_release(&(spinlock_arr[i]));
+     .      .  228:         }
+     .      .  229:     }
+     .      .  230:   }
+     .      .  231:   if(length < 0){
+     .      .  232:     handle_corrupted_list("check length");
+     .      .  233:   }
+     .      .  234:   //looks up and deletes each of the keys
+     .      .  235:   SortedListElement_t *element_ptr;
+     .      .  236:   for(i=start;i<end;i++){
+     .      .  237:     list_index = which_list(ele_arr[i].key);
+     .      .  238:     cur_list_p = &(list_arr[list_index]);
+     .      .  239:     cur_lock_p = &(lock_arr[list_index]);
+     .      .  240:     cur_spinlock_p = &(spinlock_arr[list_index]);
+     .      .  241:     if (debug_flag){
+     .      .  242:       fprintf(stderr, "%s being lookup and deleted into list %d,\n", ele_arr[i].key, list_index);
+     .      .  243:     }
+     .      .  244:     if (!sync_flag){
+     .      .  245:       element_ptr = SortedList_lookup(cur_list_p, ele_arr[i].key);
+     .      .  246:       if (element_ptr==NULL)
+     .      .  247:         handle_corrupted_list("lookup");
+     .      .  248:       if (SortedList_delete(element_ptr))
+     .      .  249:         handle_corrupted_list("delete");
+     .      .  250:     }
+     .      .  251:     else{
+     .      .  252:       switch(sync_opt){
+     .      .  253:         case 'm':
+     .      .  254: //          if (!no_timer){
+     .      .  255:             if ( clock_gettime(CLOCK_MONOTONIC, &ind_start_t) < 0){
+     .      .  256:               temp_errno = errno;
+     .      .  257:               error_handle("clock_gettime() for srart time", temp_errno);
+     .      .  258:             }
+     .      .  259: //          }
+     .      .  260:           pthread_mutex_lock(cur_lock_p);
+     .      .  261: //          if (!no_timer){
+     .      .  262:             if ( clock_gettime(CLOCK_MONOTONIC, &ind_end_t) < 0){
+     .      .  263:               temp_errno = errno;
+     .      .  264:               error_handle("clock_gettime() for end time", temp_errno);
+     .      .  265:             }
+     .      .  266:             ind_lock_time += calc_time(ind_start_t,ind_end_t);
+     .      .  267: //          }
+     .      .  268:           element_ptr = SortedList_lookup(cur_list_p, ele_arr[i].key);
+     .      .  269:           if (element_ptr==NULL)
+     .      .  270:             handle_corrupted_list("lookup");
+     .      .  271:           if (SortedList_delete(element_ptr))
+     .      .  272:             handle_corrupted_list("delete");
+     .      .  273:           pthread_mutex_unlock(cur_lock_p);
+     .      .  274:           break;
+     .      .  275:         case 's':
+     .      .  276: //          if (!no_timer){
+     .      .  277:             if ( clock_gettime(CLOCK_MONOTONIC, &ind_start_t) < 0){
+     .      .  278:               temp_errno = errno;
+     .      .  279:               error_handle("clock_gettime() for srart time", temp_errno);
+     .      .  280:             }
+     .      .  281: //          }
+   515    515  282:           while(__sync_lock_test_and_set(cur_spinlock_p, 1));
+     .      .  283: //          if (!no_timer){
+     1      1  284:             if ( clock_gettime(CLOCK_MONOTONIC, &ind_end_t) < 0){
+     .      .  285:               temp_errno = errno;
+     .      .  286:               error_handle("clock_gettime() for end time", temp_errno);
+     .      .  287:             }
+     .      .  288:             ind_lock_time += calc_time(ind_start_t,ind_end_t);
+     .      .  289: //          }
+     .     73  290:           element_ptr = SortedList_lookup(cur_list_p, ele_arr[i].key);
+     .      .  291:           if (element_ptr==NULL)
+     .      .  292:             handle_corrupted_list("lookup");
+     .      .  293:           if (SortedList_delete(element_ptr))
+     .      .  294:             handle_corrupted_list("delete");
+     .      .  295:           __sync_lock_release(cur_spinlock_p);
+     .      .  296:           break;
+     .      .  297:         default:
+     .      .  298:           fprintf(stderr, "Error with switch due to unrecognized sync option.\r\n");
+     .      .  299:           exit(1);
+     .      .  300:       }
+     .      .  301:     }
+     .      .  302:   }
+     .      .  303:   total_lock_time += ind_lock_time;
+     .      .  304:   return NULL;
+     .      .  305: }
+---
+     .      .  306: 
+     .      .  307: 
+     .      .  308: int main(int argc, char **argv){
+     .      .  309: 	int num_thread = 1;
+     .      .  310: 

@@ -1,0 +1,16 @@
+
+The serial number of the beaglebone is BBGW17080077, and the WiFi MAC address is 2CF7F106694D.
+
+The files contained in the tarball are:
+
+my_beaglebone.jpg, a selfie of me holding my assembled Beaglebone,
+
+connected.png, a screenshot of a USB terminal command session connected to my system, showing that I have given the beaglebone a name and configured network access,
+
+copy.png, a screenshot from a local session in which I copied a c-code program that prints "hello world" from my laptop to my Beaglebone,
+
+build_run.png, a screenshot from a WIFI SSH session in which I build and run a trivial program,
+
+git.png, a schreenshot from a WIFI SSH session in which I install git and clone a repository,
+
+this README file containing information about my Beaglebone and a description of all files in the tarball.

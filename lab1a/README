@@ -1,0 +1,5 @@
+
+The files included in the tarball are
+lab1a.c, a C source module as required by the spec, which compiles cleanly to an executable lab1, which takes two options --shell and --debug
+Makefile, to build the program and the tarball with options: lab1a, dist, clean as well as the default option
+README, this README file with identification information, a description of the included files, the smoke-test cases in the check target, and any other information about your submission that I would like to bring to your attention (e.g., research, limitations, features, testing methodology)...

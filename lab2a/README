@@ -1,0 +1,76 @@
+
+The files included in the tarball are,
+four C source modules that compile cleanly without errors or warnings including,
+lab2_add.c, a C program that implements and tests a shared variable add function, implements the specified command line options, and produces the specified output statistics in the spec,
+SortedList.h, a header file (supplied by instructors) describing the interfaces for linked list operations,
+SortedList.c, a C module that implements insert, delete, lookup, and length methods for a sorted doubly linked list (described in the provided header file, including correct placement of yield calls),
+lab2_list.c, a C program that implements the specified command line options and produces the (below) specified output statistics,
+lab2_add.csv and lab2_list.csv, containing all my results for all of the tests in both part 1 and part 2,
+graphs, created by running gnuplot(1) on the above .csv files with the supplied data reduction scripts, including 5 for part 1 and 4 for part 2,
+add.sh and list.sh, including over 200 test cases for both parts of the lab,
+Makefile, to build the program and the tarball with options: all, build, tests, graphs, dist, clean as well as the default option,
+README, this README file with identification information, a description of the included files, and any other information about my submission that I would like to bring to your attention (e.g., research, limitations, features, testing methodology), as well as answers to the questions posted in the spec...
+
+
+QUESTION 2.1.1 - causing conflicts:
+
+Why does it take many iterations before errors are seen?
+
+As the number of iterations increases, the number of total operations increases and the chances that multiple threads are accessing the same critical session increase. As a result, errors will appear due to race conditions.
+
+Why does a significantly smaller number of iterations so seldom fail?
+
+When the number of iterations is small, all the iterations for one thread will be finished before the next thread is created. Therefore the critical section will only be entered by one thread at a time, and there will be no errors due to race condition.
+
+
+QUESTION 2.1.2 - cost of yielding:
+
+Why are the --yield runs so much slower?
+Where is the additional time going?
+
+--yield runs slower because this option makes threads call sched_yield() in the critical section, which makes the OS do a context switch and choose another thread to run. The additional time goes to these context switches which are costly.
+
+Is it possible to get valid per-operation timings if we are using the --yield option?
+If so, explain how. If not, explain why not.
+
+It it not possible since with the large number of context switches involved, we cannot tell which threads are performing adding operations at which time, or contexts switches are happening. Therefore, excluding time used by context switches from the wall time we collected is impossible
+
+
+QUESTION 2.1.3 - measurement errors:
+Why does the average cost per operation drop with increasing iterations?
+
+Thread creation is more expensive compared to actually performing the operations, and the average cost per operation actually includes the cost of thread creation. As the number of iterations increases, cost of thread creation per operation is amortized and becomes close to zero, hence the average cost per operation also drops.
+
+If the cost per iteration is a function of the number of iterations, how do we know how many iterations to run (or what the "correct" cost is)?
+
+Increase the number of iterations until the cost per iteration stops decreasing and become constant, implying that the cost of thread creation is amortized to 0, and we can get the number of iterations and the correct cost.
+
+
+QUESTION 2.1.4 - costs of serialization:
+
+Why do all of the options perform similarly for low numbers of threads?
+
+When there are only a few threads, the chances that two or more threads are trying to access the same critical section decreases, so all the lock mechanisms are seldomly invoked and the cost will consist mainly of the actual operations. As a result, the options all perform similarly.
+
+Why do the three protected operations slow down as the number of threads rises?
+
+Conversely, the chances that two or more threads are tyring to access the same critical section increases as the total number of threads rises, so the lock mechanisms are invoked more often. Since these lock mechanisms are expensive, the operations slow down.
+
+
+QUESTION 2.2.1 - scalability of Mutex
+
+Compare the variation in time per mutex-protected operation vs the number of threads in Part-1 (adds) and Part-2 (sorted lists).
+Comment on the general shapes of the curves, and explain why they have this shape.
+Comment on the relative rates of increase and differences in the shapes of the curves, and offer an explanation for these differences.
+
+Both curves have an increasing gradient and the time per operation increases as the number of threads increases. This shape is due to the fact that as the number of threads increases, the chances of two or more threads accessing the same critical section increases, and the frequency of invoking mutex increases, resulting in longer average cost per operation.
+The time per mutex-protected operation increases with the number of threads much more drastically in part-2 than that in part-1. The time per operation increases from around 100 to around 300 nanoseconds in part-1 as the number of threads increases from 1 to 16, while the adjusted time in part-2 increases from around 10 to 1000 nanoseconds as the number of threads increases from 1 to 16. This is probably because that list operations which involves modifying multiple pointer values are more expensive than add operations which involves simply incrementing.
+
+
+QUESTION 2.2.2 - scalability of spin locks
+
+Compare the variation in time per protected operation vs the number of threads for list operations protected by Mutex vs Spin locks. Comment on the general shapes of the curves, and explain why they have this shape.
+Comment on the relative rates of increase and differences in the shapes of the curves, and offer an explanation for these differences.
+
+Both curves have an increasing gradient and the time per operation increases as the number of threads increases for both Mutex and Spin locks. This is because with increasing number of threads, the chances of two or more threads accessing the same critical section increases, and the frequency of invoking mutex or spin locks increases, resulting in longer average cost per operation.
+The relative rates of increase when the thread number is small (fewer than 8) are similar for both protection mechanisms. However, as the number of threads gets larger, the rate of increase for spin locks becomes significantly larger than that for mutex. This is probably because spin locks are generally slower than mutex when instead of sleeping immediately when the thread finds no work to do when using mutex, spinlocks keeps the CPU and wastes the CPU cycle until the time-slice passes, resulting in longer time per operation. In addition, when the thread number exceeds the number of cores, spin locks become even more expensive since while one thread waits and spins, the thread it is waiting for may be in ready state waiting for a CPU, hence becoming even more inefficient.
